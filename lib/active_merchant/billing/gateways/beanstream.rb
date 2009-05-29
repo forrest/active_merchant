@@ -12,12 +12,20 @@ module ActiveMerchant #:nodoc:
     # * +PA+ - Pre Authorization
     # * +PAC+ - Pre Authorization Completion
     #  
+    # == Secure Payment Profiles
+    # BeanStream supports payment profiles (vaults). This allows you to store cc information with BeanStream and process transactions with a customer id.
+    # Secure Payment Profiles must be enabled on your account (must be done over the phone).
+    # Your API Access Passcode must be set in Administration => account settings => order settings.
+    # Consult the Secure Payment Profile User Guide for more details.
+    # 
+    #  
     # == Notes 
     # * Recurring billing is not yet implemented.
     # * Adding of order products information is not implemented.
     # * Ensure that country and province data is provided as a code such as "CA", "US", "QC".
     # * login is the Beanstream merchant ID, username and password should be enabled in your Beanstream account and passed in using the <tt>:user</tt> and <tt>:password</tt> options.
     # * Test your app with your true merchant id and test credit card information provided in the api pdf document.
+    # * Payment Profiles cannot be deleted with the current API. The accounts are 'closed', but have to be deleted manually.
     #  
     #  Example authorization (Beanstream PA transaction type):
     #  
