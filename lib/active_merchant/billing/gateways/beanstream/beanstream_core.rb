@@ -212,7 +212,9 @@ module ActiveMerchant #:nodoc:
       end
       
       def post(data)
-        response = parse(ssl_post(URL, data))
+        url = data.include?("&passCode=") ? SECURE_PROFILE_URL : URL
+        response = parse(ssl_post(url, data))
+        response[:customer_vault_id] = response[:customerCode] if response[:customerCode]
         build_response(success?(response), message_from(response), response,
           :test => test? || response[:authCode] == "TEST",
           :authorization => authorization_from(response),
@@ -237,7 +239,7 @@ module ActiveMerchant #:nodoc:
         if source.is_a?(String) or source.is_a?(Integer)
           post[:customerCode] = source
         else
-          source.type == "check" ? add_check(post, source) : add_credit_card(post, source)
+          source.type.to_s == "check" ? add_check(post, source) : add_credit_card(post, source)
         end
       end
       
