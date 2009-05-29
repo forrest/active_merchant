@@ -12,13 +12,12 @@ module ActiveMerchant #:nodoc:
     # * +PA+ - Pre Authorization
     # * +PAC+ - Pre Authorization Completion
     #  
-    # == Secure Payment Profiles
-    # BeanStream supports payment profiles (vaults). This allows you to store cc information with BeanStream and process transactions with a customer id.
+    # == Secure Payment Profiles:
+    # BeanStream supports payment profiles (vaults). This allows you to store cc information with BeanStream and process subsequent transactions with a customer id.
     # Secure Payment Profiles must be enabled on your account (must be done over the phone).
     # Your API Access Passcode must be set in Administration => account settings => order settings.
-    # Consult the Secure Payment Profile User Guide for more details.
+    # To learn more about storing credit cards with the Beanstream gateway, please read the BEAN_Payment_Profiles.pdf (I had to phone BeanStream to request it.)
     # 
-    #  
     # == Notes 
     # * Recurring billing is not yet implemented.
     # * Adding of order products information is not implemented.
@@ -107,7 +106,7 @@ module ActiveMerchant #:nodoc:
         add_address(post, options)
         add_credit_card(post, credit_card)      
         add_secure_profile_variables(post,options)
-        commit(post)
+        commit(post, true)
       end
       
       #can't actually delete a secure profile with the supplicaed API. This function sets the status of the profile to closed (C).
@@ -125,9 +124,9 @@ module ActiveMerchant #:nodoc:
         post = {}
         add_address(post, options)
         add_credit_card(post, credit_card)
-        options.merge!({:vault_id => vault_id, :operation => secure_profile_operation(:modify)})
+        options.merge!({:vault_id => vault_id, :operation => secure_profile_action(:modify)})
         add_secure_profile_variables(post,options)
-        commit(post)
+        commit(post, true)
       end
 
       private

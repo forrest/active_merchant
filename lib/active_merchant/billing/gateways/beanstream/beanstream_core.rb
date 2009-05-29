@@ -3,6 +3,7 @@ module ActiveMerchant #:nodoc:
     module BeanstreamCore
       URL = 'https://www.beanstream.com/scripts/process_transaction.asp'
       SECURE_PROFILE_URL = 'https://www.beanstream.com/scripts/payment_profile.asp'
+      SP_SERVICE_VERSION = '1.1'
 
       TRANSACTIONS = {
         :authorization  => 'PA',
@@ -95,12 +96,12 @@ module ActiveMerchant #:nodoc:
         type == TRANSACTIONS[:check_purchase] ? :check_credit : :credit
       end
       
-      def split_auth(string)
-        string.split(";")
+      def secure_profile_action(type)
+        PROFILE_OPERATIONS[type] || PROFILE_OPERATIONS[:new]
       end
       
-      def secure_profile_operation(type)
-        PROFILE_OPERATIONS[type] || PROFILE_OPERATIONS[:new]
+      def split_auth(string)
+        string.split(";")
       end
       
       def add_amount(post, money)
@@ -177,15 +178,13 @@ module ActiveMerchant #:nodoc:
       end
       
       def add_secure_profile_variables(post, options = {})
-        post[:serviceVersion] = 1.1
-        post[:using_secure_profile] = true
-        post[:operationType] = options[:operationType] || options[:operation] || secure_profile_operation(:new)
-        post[:responseFormat] = "QS"
-        post[:cardValidation] = (options[:cardValidation].to_i==1) || 0
+        post[:serviceVersion] = SP_SERVICE_VERSION
+        post[:responseFormat] = 'QS'
+        post[:cardValidation] = (options[:cardValidation].to_i == 1) || '0'
         
-        vault_id = options[:billing_id] || options.delete(:vault_id) || false
-        post[:customerCode] = vault_id if vault_id
-        post[:status] = options[:status] if options[:status]
+        post[:operationType] = options[:operationType] || options[:operation] || secure_profile_action(:new)
+        post[:customerCode] = options[:billing_id] || options[:vault_id] || false
+        post[:status] = options[:status]
       end
       
       def parse(body)
@@ -207,13 +206,12 @@ module ActiveMerchant #:nodoc:
         results
       end
       
-      def commit(params)
-        post(post_data(params))
+      def commit(params, use_profile_api = false)
+        post(post_data(params,use_profile_api),use_profile_api)
       end
       
-      def post(data)
-        url = data.include?("&passCode=") ? SECURE_PROFILE_URL : URL
-        response = parse(ssl_post(url, data))
+      def post(data, use_profile_api)
+        response = parse(ssl_post((use_profile_api ? SECURE_PROFILE_URL : URL), data))
         response[:customer_vault_id] = response[:customerCode] if response[:customerCode]
         build_response(success?(response), message_from(response), response,
           :test => test? || response[:authCode] == "TEST",
@@ -247,12 +245,11 @@ module ActiveMerchant #:nodoc:
         post[:trnType] = TRANSACTIONS[action]
       end
           
-      def post_data(params)
+      def post_data(params, use_profile_api)
         params[:requestType] = 'BACKEND'
-        if params[:using_secure_profile]
-          params.delete(:using_secure_profile)
+        if use_profile_api
           params[:merchantId] = @options[:login] 
-          params[:passCode] = @options[:secure_profile_api_key] if @options[:secure_profile_api_key]
+          params[:passCode] = @options[:secure_profile_api_key]
         else
           params[:username] = @options[:user] if @options[:user]
           params[:password] = @options[:password] if @options[:password]
