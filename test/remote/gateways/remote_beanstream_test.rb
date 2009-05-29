@@ -160,7 +160,6 @@ class RemoteBeanstreamTest < Test::Unit::TestCase
     assert response = @gateway.store(@visa, @options.dup)
     assert_equal 'Operation Successful', response.message
     assert_success response
-    p response
     assert_equal @options[:vault_id], response.params["customer_vault_id"].to_i
   end
 
