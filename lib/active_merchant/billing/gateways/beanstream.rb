@@ -91,6 +91,36 @@ module ActiveMerchant #:nodoc:
       def interac
         @interac ||= BeanstreamInteracGateway.new(@options)
       end
+      
+      # To match the other stored-value gateways, like TrustCommerce,
+      # store and unstore need to be defined
+      def store(credit_card, options = {})
+        post = {}        
+        add_address(post, options)
+        add_credit_card(post, credit_card)      
+        add_secure_profile_variables(post,options)
+        commit(post)
+      end
+      
+      #can't actually delete a secure profile with the supplicaed API. This function sets the status of the profile to closed (C).
+      #Closed profiles will have to removed manually.
+      def delete(vault_id)
+        update(vault_id, false, {:status => "C"})
+      end
+      
+      alias_method :unstore, :delete
+      
+      # Update the values (such as CC expiration) stored at
+      # the gateway.  The CC number must be supplied in the
+      # CreditCard object.
+      def update(vault_id, credit_card, options = {})
+        post = {}
+        add_address(post, options)
+        add_credit_card(post, credit_card)
+        options.merge!({:vault_id => vault_id, :operation => secure_profile_operation(:modify)})
+        add_secure_profile_variables(post,options)
+        commit(post)
+      end
 
       private
       def build_response(*args)

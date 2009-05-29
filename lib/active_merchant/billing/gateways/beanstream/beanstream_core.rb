@@ -2,6 +2,7 @@ module ActiveMerchant #:nodoc:
   module Billing #:nodoc:
     module BeanstreamCore
       URL = 'https://www.beanstream.com/scripts/process_transaction.asp'
+      SECURE_PROFILE_URL = 'https://www.beanstream.com/scripts/payment_profile.asp'
 
       TRANSACTIONS = {
         :authorization  => 'PA',
@@ -13,6 +14,11 @@ module ActiveMerchant #:nodoc:
         :check_credit   => 'C',
         :void_purchase  => 'VP',
         :void_credit    => 'VR'
+      }
+
+      PROFILE_OPERATIONS = {
+        :new => 'N',
+        :modify => 'M'
       }
 
       CVD_CODES = {
@@ -93,6 +99,10 @@ module ActiveMerchant #:nodoc:
         string.split(";")
       end
       
+      def secure_profile_operation(type)
+        PROFILE_OPERATIONS[type] || PROFILE_OPERATIONS[:new]
+      end
+      
       def add_amount(post, money)
         post[:trnAmount] = amount(money)
       end
@@ -143,11 +153,13 @@ module ActiveMerchant #:nodoc:
       end
       
       def add_credit_card(post, credit_card)
-        post[:trnCardOwner] = credit_card.name
-        post[:trnCardNumber] = credit_card.number
-        post[:trnExpMonth] = format(credit_card.month, :two_digits)
-        post[:trnExpYear] = format(credit_card.year, :two_digits)
-        post[:trnCardCvd] = credit_card.verification_value
+        if credit_card
+          post[:trnCardOwner] = credit_card.name
+          post[:trnCardNumber] = credit_card.number
+          post[:trnExpMonth] = format(credit_card.month, :two_digits)
+          post[:trnExpYear] = format(credit_card.year, :two_digits)
+          post[:trnCardCvd] = credit_card.verification_value
+        end
       end
             
       def add_check(post, check)
@@ -162,6 +174,18 @@ module ActiveMerchant #:nodoc:
         
         # The account number of the consumer’s bank account.  Required for both Canadian and US dollar EFT transactions.
         post[:accountNumber] = check.account_number
+      end
+      
+      def add_secure_profile_variables(post, options = {})
+        post[:serviceVersion] = 1.1
+        post[:using_secure_profile] = true
+        post[:operationType] = options[:operationType] || options[:operation] || secure_profile_operation(:new)
+        post[:responseFormat] = "QS"
+        post[:cardValidation] = (options[:cardValidation].to_i==1) || 0
+        
+        vault_id = options[:billing_id] || options.delete(:vault_id) || false
+        post[:customerCode] = vault_id if vault_id
+        post[:status] = options[:status] if options[:status]
       end
       
       def parse(body)
@@ -202,15 +226,19 @@ module ActiveMerchant #:nodoc:
       end
 
       def message_from(response)
-        response[:messageText]
+        response[:messageText] || response[:responseMessage]
       end
 
       def success?(response)
-        response[:responseType] == 'R' || response[:trnApproved] == '1'
+        response[:responseType] == 'R' || response[:trnApproved] == '1' || response[:responseCode] == '1'
       end
       
       def add_source(post, source)
-        source.type == "check" ? add_check(post, source) : add_credit_card(post, source)
+        if source.is_a?(String) or source.is_a?(Integer)
+          post[:customerCode] = source
+        else
+          source.type == "check" ? add_check(post, source) : add_credit_card(post, source)
+        end
       end
       
       def add_transaction_type(post, action)
@@ -219,9 +247,15 @@ module ActiveMerchant #:nodoc:
           
       def post_data(params)
         params[:requestType] = 'BACKEND'
-        params[:merchant_id] = @options[:login]
-        params[:username] = @options[:user] if @options[:user]
-        params[:password] = @options[:password] if @options[:password]
+        if params[:using_secure_profile]
+          params.delete(:using_secure_profile)
+          params[:merchantId] = @options[:login] 
+          params[:passCode] = @options[:secure_profile_api_key] if @options[:secure_profile_api_key]
+        else
+          params[:username] = @options[:user] if @options[:user]
+          params[:password] = @options[:password] if @options[:password]
+          params[:merchant_id] = @options[:login]     
+        end
         params[:vbvEnabled] = '0'
         params[:scEnabled] = '0'
         
